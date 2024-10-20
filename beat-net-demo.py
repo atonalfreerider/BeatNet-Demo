@@ -3,6 +3,8 @@ import json
 import numpy as np
 import librosa
 import matplotlib.pyplot as plt
+from pydub import AudioSegment
+from pydub.generators import Sine
 
 # Load and process the audio file
 audio_file = "/home/john/Desktop/Audio/BeatNet-Demo/william-larissa.mp3"
@@ -44,6 +46,20 @@ plt.tight_layout()
 plt.savefig('waveform_with_beats.png')
 plt.close()
 
+# Create a WAV file with metronome ticks for downbeats and offbeats
+audio = AudioSegment.from_mp3(audio_file)
+downbeat_tick = Sine(1200).to_audio_segment(duration=50).fade_out(25).apply_gain(-3)
+offbeat_tick = Sine(800).to_audio_segment(duration=50).fade_out(25).apply_gain(-6)
+
+for beat in beats:
+    position_ms = int(beat * 1000)
+    if beat in downbeats:
+        audio = audio.overlay(downbeat_tick, position=position_ms)
+    else:
+        audio = audio.overlay(offbeat_tick, position=position_ms)
+
+audio.export("audio_with_beats.wav", format="wav")
+
 # Convert numpy arrays to lists for JSON serialization
 def numpy_to_list(obj):
     if isinstance(obj, np.ndarray):
@@ -59,4 +75,5 @@ with open('output.json', 'w') as json_file:
     json.dump(numpy_to_list(Output), json_file, indent=4)
 
 print("Waveform with beats has been saved as 'waveform_with_beats.png'")
+print("Audio with beat ticks has been saved as 'audio_with_beats.wav'")
 print("BeatNet output has been saved as 'output.json'")

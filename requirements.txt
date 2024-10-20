@@ -2,3 +2,4 @@ librosa
 madmom
 BeatNet
 matplotlib
+pydub
