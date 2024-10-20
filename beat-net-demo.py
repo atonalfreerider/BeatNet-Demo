@@ -41,34 +41,50 @@ def process_audio(input_file):
 
     # Extract beat and downbeat information
     beats = Output[:, 0]
-    downbeats = Output[Output[:, 1] == 2, 0]
+    beat_types = Output[:, 1]
+
+    # Determine the beat pattern
+    unique_beat_types = np.unique(beat_types)
+    if len(unique_beat_types) == 2:
+        pattern = "1-2"
+    elif len(unique_beat_types) == 4:
+        pattern = "1-2-3-4"
+    elif len(unique_beat_types) == 3:
+        pattern = "1-2-3"
+    else:
+        pattern = "unknown"
 
     # Create the plot
     plt.figure(figsize=(20, 6))
     librosa.display.waveshow(y, sr=sr, alpha=0.5)
-    for beat in beats:
-        if beat in downbeats:
+    for beat, beat_type in zip(beats, beat_types):
+        if beat_type == 1:
             plt.axvline(x=beat, color='r', linewidth=2, alpha=0.8)  # Downbeats (heavy hash mark)
+        elif (pattern == "1-2" and beat_type == 2) or (pattern in ["1-2-3-4", "1-2-3"] and beat_type == 3):
+            plt.axvline(x=beat, color='g', linewidth=1.5, alpha=0.6)  # Upbeats (medium hash mark)
         else:
-            plt.axvline(x=beat, color='g', linewidth=1, alpha=0.5)  # Regular beats (light tick mark)
-    plt.title('Audio Waveform with Beats and Downbeats')
+            plt.axvline(x=beat, color='b', linewidth=1, alpha=0.4)  # Other beats (light hash mark)
+    plt.title(f'Audio Waveform with Beats (Pattern: {pattern})')
     plt.xlabel('Time (seconds)')
     plt.ylabel('Amplitude')
     plt.tight_layout()
     plt.savefig(os.path.join(file_dir, f"{file_name}_beat-analysis.png"))
     plt.close()
 
-    # Create a WAV file with metronome ticks for downbeats and offbeats
+    # Create a WAV file with metronome ticks for different beat types
     audio = AudioSegment.from_file(audio_file)
-    downbeat_tick = Sine(1200).to_audio_segment(duration=50).fade_out(25).apply_gain(-3)
-    offbeat_tick = Sine(800).to_audio_segment(duration=50).fade_out(25).apply_gain(-6)
+    downbeat_tick = Sine(1000).to_audio_segment(duration=50).fade_out(25).apply_gain(-3)
+    upbeat_tick = Sine(1200).to_audio_segment(duration=50).fade_out(25).apply_gain(-6)
+    other_tick = Sine(800).to_audio_segment(duration=50).fade_out(25).apply_gain(-9)
 
-    for beat in beats:
+    for beat, beat_type in zip(beats, beat_types):
         position_ms = int(beat * 1000)
-        if beat in downbeats:
+        if beat_type == 1:
             audio = audio.overlay(downbeat_tick, position=position_ms)
+        elif (pattern == "1-2" and beat_type == 2) or (pattern in ["1-2-3-4", "1-2-3"] and beat_type == 3):
+            audio = audio.overlay(upbeat_tick, position=position_ms)
         else:
-            audio = audio.overlay(offbeat_tick, position=position_ms)
+            audio = audio.overlay(other_tick, position=position_ms)
 
     audio.export(os.path.join(file_dir, f"{file_name}_beat-analysis.wav"), format="wav")
 
