@@ -4,9 +4,22 @@ from BeatNet.BeatNet import BeatNet
 import json
 import numpy as np
 import librosa
+import librosa.display
 import matplotlib.pyplot as plt
 from pydub import AudioSegment
 from pydub.generators import Sine
+from moviepy.editor import VideoFileClip
+
+def extract_audio(input_file):
+    file_ext = os.path.splitext(input_file)[1].lower()
+    if file_ext == '.mp4':
+        video = VideoFileClip(input_file)
+        audio = video.audio
+        temp_audio_file = input_file.replace('.mp4', '_temp.wav')
+        audio.write_audiofile(temp_audio_file)
+        video.close()
+        return temp_audio_file
+    return input_file
 
 def process_audio(input_file):
     # Get the directory, filename, and extension of the input file
@@ -14,14 +27,17 @@ def process_audio(input_file):
     file_name = os.path.splitext(os.path.basename(input_file))[0]
     file_ext = os.path.splitext(input_file)[1].lower()
 
+    # Extract audio if it's an MP4 file
+    audio_file = extract_audio(input_file)
+
     # Load and process the audio file
-    y, sr = librosa.load(input_file)
+    y, sr = librosa.load(audio_file)
 
     # Initialize BeatNet
     estimator = BeatNet(1, mode='offline', inference_model='DBN', plot=[], thread=False)
 
     # Process the audio file
-    Output = estimator.process(input_file)
+    Output = estimator.process(audio_file)
 
     # Extract beat and downbeat information
     beats = Output[:, 0]
@@ -43,7 +59,7 @@ def process_audio(input_file):
     plt.close()
 
     # Create a WAV file with metronome ticks for downbeats and offbeats
-    audio = AudioSegment.from_file(input_file, format=file_ext[1:])
+    audio = AudioSegment.from_file(audio_file)
     downbeat_tick = Sine(1200).to_audio_segment(duration=50).fade_out(25).apply_gain(-3)
     offbeat_tick = Sine(800).to_audio_segment(duration=50).fade_out(25).apply_gain(-6)
 
@@ -76,9 +92,13 @@ def process_audio(input_file):
     print(f"  - Audio with beats: {file_name}_beat-analysis.wav")
     print(f"  - Beat data: {file_name}_beat-analysis.json")
 
+    # Clean up temporary audio file if it was created
+    if audio_file != input_file:
+        os.remove(audio_file)
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python beat-net-demo.py <path_to_audio_file>")
+        print("Usage: python beat-net-demo.py <path_to_audio_or_video_file>")
         sys.exit(1)
     
     input_file = sys.argv[1]
